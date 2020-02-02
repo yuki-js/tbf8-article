@@ -4,7 +4,7 @@
 
 ミスモナコインです。最近活動再開しました。以前は、ご存知の方はご存知の通り、ウォレットアプリを開発していましたが、最近ではSubstrateを使って独自ブロックチェーンを開発しています。本記事ではSubstrateの紹介と、簡単なブロックチェーンを作ります。モナコイン要素はありません。
 
-本記事の情報は全て2020年2月現在のものです。Ubuntu Server 18.04で動作確認済みです。
+本記事の情報は全て2020年2月現在のものです。
 
 ## Substrateとは
 
@@ -35,7 +35,7 @@ WebAssemblyとは、「ネイティブに近いパフォーマンスで動作す
 
 SubstrateはWebAssemblyインタプリタを備えていて、WebAssemblyバイナリを与えることで、ノード全体を再コンパイルすることなく、ブロック生成ロジック(ランタイム)を変更することができます。WebAssemblyなので、速度もそこそこです。
 
-### フォークレス・チェーン・アップグレード
+### フォークレス・アップグレード
 
 今までのブロックチェーンでは、後方互換性がない変更をチェーンに加える場合、ハードフォークを実行しなければなりませんでした。DAO事件、Segwit論争を通して、ハードフォークには多くの政治的論争がつきものだということがわかりました。また、ハードフォークをするには、全てのノードをアップグレードしなければなりません。これがノード運営者の負担になっています。
 
@@ -70,6 +70,8 @@ cd substrate-node-template
 cargo build --release
 ```
 
+ちなみに、上記gitリポジトリの執筆当時のコミットハッシュは1d6e830474290d3a1893a475aca305c1c65b5f03です
+
 ビルドが完了したら
 
 ```
@@ -86,6 +88,43 @@ cargo build --release
 `localhost`以外からのRPC接続を受け付けるには`--ws-external --rpc-external`オプションを追加します。
 
 起動できたら、Polkadot/Substrate Portal(https://polkadot.js.org/apps/)の Settings からノードに接続します。接続したら、 Explorer から6秒毎にブロックが生成される様子が観察できます。 Accounts から残高確認・送金ができます。開発者モードが有効なら、ALICEやBOBに10億枚くらい残高が入っています。
+
+## Palletを実装する
+
+
+次に、Palletを実装し、独自の機能を実装していきます。
+
+今回製作するものは、電子証明書を保存するチェーンです。なんだこれは、と感じる方もいらっしゃると思います。実はこれは現在私が製作しているものに繋がるものです。
+
+### Palletの準備
+
+まず、runtime/src/template.rsを、runtime/src/certstore.rsにリネームします。
+
+次に、runtime/src/lib.rsをエディタで開きます。
+
+```
+mod template;
+```
+となっている部分を、
+```
+mod certstore;
+```
+に置換します。
+
+`impl template`の部分を`impl certstore`に置換します。
+```
+-impl template::Trait for Runtime {
++impl certstore::Trait for Runtime {
+```
+
+最後にPalletを識別するときに使う`TemplateModule`という名前を`CertStore`と変更し、`template`を`certstore`に変更します。
+
+```
+-TemplateModule: template::{Module, Call, Storage, Event<T>},
++TemplateModule: template::{Module, Call, Storage, Event<T>},
+```
+
+これでcertstoreという名前でPalletを使えます。
 
 
 
