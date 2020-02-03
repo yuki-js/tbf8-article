@@ -117,14 +117,29 @@ mod certstore;
 +impl certstore::Trait for Runtime {
 ```
 
-最後にPalletを識別するときに使う`TemplateModule`という名前を`CertStore`と変更し、`template`を`certstore`に変更します。
+Palletを識別するときに使う`TemplateModule`という名前を`CertStore`と変更し、`template`を`certstore`に変更します。
 
 ```
 -TemplateModule: template::{Module, Call, Storage, Event<T>},
 +TemplateModule: template::{Module, Call, Storage, Event<T>},
 ```
 
+最後にruntime/src/certstore.rsの`decl_storage!`マクロ内の`TemplateModule`の名前を変更します。
+
+```
+-trait Store for Module<T: Trait> as TemplateModule {
++trait Store for Module<T: Trait> as CertStore {
+```
+
 これでcertstoreという名前でPalletを使えます。
+
+### Palletの実装
+
+runtime/src/certstore.rsにPalletのロジックなどを書いていきます。
+
+Substrateは、Rustの強力なマクロで、面倒臭い部分を隠蔽しています。開発者がすることは、指定されたマクロブロックに指定された形式で記述することだけです。
+Rustに慣れている人は逆に、このソースコードを読んでも理解し難いかもしれません。マクロで構文をかなり弄られているので。
+
 
 
 
