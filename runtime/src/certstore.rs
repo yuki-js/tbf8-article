@@ -23,7 +23,7 @@ pub struct Certificate {
 decl_storage! {
     trait Store for Module<T: Trait> as CertStore {
         /// 証明書のハッシュテーブル
-        Certificates get(fn cert): map H256 => Certificate<T::AccountId>;
+        Certificates get(fn cert): map H256 => Certificate;
 
         /// 証明書ハッシュの配列
         CertificateArray: map u128 => H256;
