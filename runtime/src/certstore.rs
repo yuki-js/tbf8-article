@@ -3,7 +3,7 @@ use frame_support::{
     decl_event, decl_module, decl_storage,
     dispatch::{Decode, DispatchResult, Encode, Vec},
 };
-use sp_core::{hash::H256, Blake2Hasher, Hasher};
+use sp_core::{hash::{H256, H512}, Blake2Hasher, Hasher};
 use sp_runtime::traits::Verify;
 use sp_runtime::MultiSignature;
 use system::ensure_signed;
@@ -90,7 +90,7 @@ impl<T: Trait> Module<T> {
     }
     /// 証明書を記録する
     pub fn insert_cert(hash: H256, cert: Certificate) -> DispatchResult {
-        Certificates::insert(&hash, cert);
+        Certificates::insert(hash.clone(), cert);
         let current_index = CertificateCount::get();
         CertificateArray::insert(current_index, &hash);
         let next_index = current_index.checked_add(1).ok_or("index overflowed")?;
