@@ -2,14 +2,22 @@ use frame_support::{
     decl_event, decl_module, decl_storage,
     dispatch::{Decode, DispatchResult, Encode, Vec},
 };
-use sp_core::{hash::H256, Blake2Hasher, Hasher};
+use sp_core::{hash::H256, sr25519::Pair, Blake2Hasher, Hasher};
 use system::ensure_signed;
+
 pub trait Trait: system::Trait {
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
 
 type CertificateData = Vec<u8>;
-type Sig = H256; // Signatureって名前を使うとバグるっぽい
+
+#[derive(Decode, Encode, Clone, PartialEq, Default)]
+#[cfg_attr(feature = "std", derive(Debug))]
+pub struct Sig {
+    // Signatureって名前を使うとバグるっぽい
+    pub signature: H256,
+    pub pubkey: Vec<u8>,
+}
 
 #[derive(Decode, Encode, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "std", derive(Debug))]
@@ -50,7 +58,7 @@ decl_module! {
         pub fn add_cert(origin, data: CertificateData, sigs: Vec<Sig>) -> DispatchResult {
             let sender = ensure_signed(origin)?;
             // some check
-
+            Self::check_cert(data, sigs)?;
             let hash = Blake2Hasher::hash(&data[..]);
             let cert = Certificate {
                 data: data,
@@ -59,12 +67,22 @@ decl_module! {
             };
             Self::insert_cert(hash, cert)?;
             Self::deposit_event(RawEvent::CertAdded(sender, hash));
+
             Ok(())
         }
     }
 }
 
 impl<T: Trait> Module<T> {
+    /// 証明書をチェックする
+    pub fn check_cert(cert: CertificateData, sigs: Vec<Sig>) -> DispatchResult {
+        for sig in sigs.iter() {
+            if !Pair::verify(sig.signature, cert, sig.pubkey) {
+                return Err(sp_runtime::DispatchError::Other("Signature is invalid"));
+            }
+        }
+        Ok(())
+    }
     /// 証明書を記録する
     pub fn insert_cert(hash: H256, cert: Certificate) -> DispatchResult {
         Certificates::insert(&hash, cert);
