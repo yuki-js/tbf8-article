@@ -58,17 +58,16 @@ decl_module! {
 
         /// 証明書追加
         pub fn add_cert(origin, data: CertificateData, sigs: Vec<Sig>) -> DispatchResult {
-            let sender = ensure_signed(origin)?;
-            // some check
+            let sender = ensure_signed(origin)?; // 署名済みトランザクションか?
             Self::check_cert(&data, &sigs)?;
-            let hash = Blake2Hasher::hash(&data[..]);
-            let cert = Certificate {
+            let hash = Blake2Hasher::hash(&data[..]); // ハッシュ値計算
+            let cert = Certificate { // 構造体を用意
                 data: data,
                 sigs: sigs,
                 hash: hash.clone(),
             };
-            Self::insert_cert(hash, cert)?;
-            Self::deposit_event(RawEvent::CertAdded(sender, hash));
+            Self::insert_cert(hash, cert)?; 
+            Self::deposit_event(RawEvent::CertAdded(sender, hash)); // イベント発行
 
             Ok(())
         }
@@ -82,7 +81,7 @@ impl<T: Trait> Module<T> {
             let s = MultiSignature::Sr25519(
                 sp_core::sr25519::Signature::try_from(&sig.signature[..]).map_err(|_| "This is not a signature")?,
             );
-            if !s.verify(&cert[..], &sig.account_id) {
+            if !s.verify(&cert[..], &sig.account_id) { // 署名の検証
                 return Err(sp_runtime::DispatchError::Other("Signature is invalid"));
             }
         }

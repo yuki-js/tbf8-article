@@ -2,7 +2,7 @@
 
 <div style="text-align:right">ミスモナコイン</div>
 
-ミスモナコインです。最近活動再開しました。以前は、ご存知の方はご存知の通り、ウォレットアプリを開発していましたが、最近ではSubstrateを使って独自ブロックチェーンを開発しています。本記事ではSubstrateの紹介と、簡単なブロックチェーンを作ります。モナコイン要素はありません。
+ミスモナコインです。最近活動再開しました。以前は、ご存知の方はご存知の通り、ウォレットアプリ[^monya]を開発していましたが、最近ではSubstrateを使って独自ブロックチェーンを開発しています。本記事ではSubstrateの紹介と、簡単なブロックチェーンを作ります。モナコイン要素はありません。
 
 本記事の情報は全て2020年2月現在のものです。
 
@@ -141,33 +141,109 @@ runtime/src/certstore.rsにPalletのロジックなどを書いていきます�
 
 Substrateは、Rustの強力なマクロ構文で、面倒臭い部分を隠蔽しています。マクロブロックに指定された構文で記述するだけで実装できます。そのため、Rustに慣れている人ほどソースコードを読んでも理解し難いかもしれません。
 
-以下は、何の関数・変数も実装しない状態のコードです。これに関数などを付け足していきます。
+以下が完成品です。
 
 ```
-use frame_support::{decl_module, decl_storage, decl_event, dispatch::DispatchResult};
+use core::convert::TryFrom;
+use frame_support::{
+    decl_event, decl_module, decl_storage,
+    dispatch::{Decode, DispatchResult, Encode, Vec},
+};
+use sp_core::{hash::{H256, H512}, Blake2Hasher, Hasher};
+use sp_runtime::traits::Verify;
+use sp_runtime::MultiSignature;
 use system::ensure_signed;
 
 pub trait Trait: system::Trait {
-	type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
+    type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
+}
+
+type CertificateData = Vec<u8>;
+
+#[derive(Decode, Encode, Clone, PartialEq, Default, Debug)]
+pub struct Sig {
+    // Signatureって名前を使うとバグるっぽい
+    pub signature: H512,
+    pub account_id: sp_runtime::AccountId32,
+}
+
+#[derive(Decode, Encode, Clone, PartialEq, Default)]
+#[cfg_attr(feature = "std", derive(Debug))]
+pub struct Certificate {
+    pub data: CertificateData,
+    pub hash: H256,
+    pub sigs: Vec<Sig>,
 }
 
 decl_storage! {
-	trait Store for Module<T: Trait> as TemplateModule {
-	}
-}
+    trait Store for Module<T: Trait> as CertStore {
+        /// 証明書のハッシュテーブル
+        Certificates get(fn cert): map H256 => Certificate;
 
-decl_module! {
-	/// The module declaration.
-	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
-		fn deposit_event() = default;
-	}
+        /// 証明書ハッシュの配列
+        CertificateArray: map u128 => H256;
+
+        /// 証明書ハッシュ配列の要素数
+        CertificateCount get(fn cert_count): u128;
+    }
 }
 
 decl_event!(
-	pub enum Event<T> where AccountId = <T as system::Trait>::AccountId {
-		DummyEvent(AccountId),
-	}
+    pub enum Event<T>
+    where
+        AccountId = <T as system::Trait>::AccountId,
+    {
+        /// 証明書が追加されました!
+        CertAdded(AccountId, H256),
+    }
 );
+
+decl_module! {
+    pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+        fn deposit_event() = default;
+
+        /// 証明書追加
+        pub fn add_cert(origin, data: CertificateData, sigs: Vec<Sig>) -> DispatchResult {
+            let sender = ensure_signed(origin)?;
+            // some check
+            Self::check_cert(&data, &sigs)?;
+            let hash = Blake2Hasher::hash(&data[..]);
+            let cert = Certificate {
+                data: data,
+                sigs: sigs,
+                hash: hash.clone(),
+            };
+            Self::insert_cert(hash, cert)?;
+            Self::deposit_event(RawEvent::CertAdded(sender, hash));
+
+            Ok(())
+        }
+    }
+}
+
+impl<T: Trait> Module<T> {
+    /// 証明書をチェックする
+    pub fn check_cert(cert: &CertificateData, sigs: &Vec<Sig>) -> DispatchResult {
+        for sig in sigs.iter() {
+            let s = MultiSignature::Sr25519(
+                sp_core::sr25519::Signature::try_from(&sig.signature[..]).map_err(|_| "This is not a signature")?,
+            );
+            if !s.verify(&cert[..], &sig.account_id) {
+                return Err(sp_runtime::DispatchError::Other("Signature is invalid"));
+            }
+        }
+        Ok(())
+    }
+    /// 証明書を記録する
+    pub fn insert_cert(hash: H256, cert: Certificate) -> DispatchResult {
+        Certificates::insert(hash.clone(), cert);
+        let current_index = CertificateCount::get();
+        CertificateArray::insert(current_index, &hash);
+        let next_index = current_index.checked_add(1).ok_or("index overflowed")?;
+        CertificateCount::put(next_index);
+        Ok(())
+    }
+}
 ```
 
 `use`のモジュール読み込みと`Trait`の定義は所謂「おまじない」です。
@@ -182,20 +258,14 @@ Solidityでいう状態変数です。
 ```
 #[derive(Decode, Encode, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "std", derive(Debug))]
-pub struct Certificate {
-    pub data: CertificateData,
-    pub hash: H256,
-    pub sigs: Vec<Sig>
-}
+pub struct Certificate { ... 省略 ...}
 
 decl_storage! {
     trait Store for Module<T: Trait> as CertStore {
         /// 証明書のハッシュテーブル
         Certificates get(fn cert): map H256 => Certificate;
-
         /// 証明書ハッシュの配列
         CertificateArray: map u128 => H256;
-
         /// 証明書ハッシュ配列の要素数
         CertificateCount get(fn cert_count): u128;
     }
@@ -222,135 +292,46 @@ CertificateCount::put(next_index); // 新しい配列長を書き込み
 `fn deposit_event() = default;`はおまじないです。Rustにはこんな構文はないので、本当の意味でのおまじないだと思われます。イベントを呼び出す関数を定義しているようです。
 あとは通常の関数の定義です。ここで定義された`Module`に`impl`もできます。
 
-この部分は長いので、実装は省略します。
+`let sender = ensure_signed(origin)?;`は、署名されているかどうかを調べ、署名者のアドレスを返してくれます。署名済みでなければErr(_)を返します。`ensure_none`というのもあって、署名されていないトランザクションかどうかを調べてくれます。これは、手数料をかけなくてもいいような軽い処理や、自前で署名検証機構を備えている時に便利です。
 
 #### decl_event!
 
 イベントの定義です。Solidityで言うイベントです。
 引数に`AccountId`(`<T as system::Trait>::AccountId`)と`H256`を持つ`CertAdded`イベントです。ここにあるコメントも解釈してUI側に伝えてくれます。
-```
-decl_event!(
-    pub enum Event<T>
-    where
-        AccountId = <T as system::Trait>::AccountId,
-    {
-        /// 証明書が追加された時のイベント
-        CertAdded(AccountId, H256),
-    }
-);
-```
 
 #### 完成
 
-完成したソースコードはこちらです
+完成したら、
 
 ```
-use frame_support::{
-    decl_event, decl_module, decl_storage,
-    dispatch::{Decode, DispatchResult, Encode, Vec},
-};
-use sp_core::{Blake2Hasher, Hasher, hash::H256};
-use system::ensure_signed;
-pub trait Trait: system::Trait {
-    type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
-}
-
-type CertificateData = Vec<u8>;
-type Signature = [u8; 32];
-
-#[derive(Decode, Encode, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "std", derive(Debug))]
-pub struct Certificate {
-    pub data: CertificateData,
-    pub hash: H256,
-    pub sigs: Vec<Signature>
-}
-
-/// ストレージのデータ構造を作る
-decl_storage! {
-    trait Store for Module<T: Trait> as CertStore {
-        /// 証明書のハッシュテーブル
-        Certificates get(fn cert): map H256 => Certificate<T::AccountId>;
-
-        /// 証明書ハッシュの配列
-        CertificateArray: map u128 => H256;
-
-        /// 証明書ハッシュ配列の要素数
-        CertificateCount get(fn cert_count): u128;
-    }
-}
-
-decl_event!(
-    pub enum Event<T>
-    where
-        AccountId = <T as system::Trait>::AccountId,
-    {
-        /// 証明書が追加された時のイベント
-        CertAdded(AccountId, H256),
-    }
-);
-
-decl_module! {
-    pub struct Module<T: Trait> for enum Call where origin: T::Origin {
-        fn deposit_event() = default;
-
-        /// 証明書追加
-        pub fn add_cert(origin, data: CertificateData, sigs: Vec<Signature>) -> DispatchResult {
-            let sender = ensure_signed(origin)?;
-            // some check
-            let hash = Self::insert_cert(data, sigs)?;
-            Self::deposit_event(RawEvent::CertAdded(sender, hash));
-            Ok(())
-        }
-    }
-}
-
-impl<T: Trait> Module<T> {
-    /// 証明書を記録する
-    pub fn insert_cert(
-        data: CertificateData,
-        sigs: Vec<Signature>,
-    ) -> Result<H256, &'static str> {
-        let hash = Blake2Hasher::hash(&data[..]);
-        Certificates::insert(
-            &hash,
-            Certificate {
-                data: data,
-                sigs: sigs,
-                hash: hash.clone(),
-            },
-        );
-        let current_index = CertificateCount::get();
-        CertificateArray::insert(current_index, &hash);
-        let next_index = current_index.checked_add(1).ok_or("index overflowed")?;
-        CertificateCount::put(next_index);
-        Ok(hash)
-    }
-}
+cargo build --release
 ```
 
-## UIをつくる
-
-次に、UIを作ります。
-
-yarn必須です。
+でビルドをし
 
 ```
-git clone https://github.com/polkadot-js/apps
-cd apps
-yarn
+./target/release/node-template purge-chain --dev
 ```
-依存パッケージのインストールが終わったら
+
+でチェーンをリセットし、
+
 ```
-yarn run start
+./target/release/node-template --dev
 ```
-でwebpackが走ります。
+
+で起動できます。
+
 
 
 ## 困った時のリンク集
 
+#### Substrate Developer Hub
 
+https://substrate.dev/
 
+Substrateの公式ドキュメントサイトです。
+
+[^monya]: https://monya-wallet.github.io/
 [^hello]: https://www.parity.io/hello-substrate/
 [^wasm]: https://developer.mozilla.org/ja/docs/WebAssembly
 [^noarr]: 探索コストがO(n)だとnが大きくなるとDoS攻撃ができてしまうため。Vecは存在するが、利用するときは注意。
