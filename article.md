@@ -1,4 +1,4 @@
-# Substrateを使ってみた
+# Substrate v2.0対応 Substrateことはじめ
 
 <div style="text-align:right">ミスモナコイン</div>
 
@@ -60,6 +60,8 @@ curl https://getsubstrate.io -sSf | bash
 
 https://substrate.dev/docs/en/overview/getting-started
 
+## 
+
 ## 素のチェーンを動かしてみる
 
 まずは、テンプレートから何も手を加えない状態の、特に何をするわけでもないブロックチェーンノードを起動してみます。
@@ -87,14 +89,14 @@ cargo build --release
 でノードを開発者モードで起動します。
 `localhost`以外からのRPC接続を受け付けるには`--ws-external --rpc-external`オプションを追加します。
 
-起動できたら、Polkadot/Substrate Portal(https://polkadot.js.org/apps/)の Settings からノードに接続します。接続したら、 Explorer から6秒毎にブロックが生成される様子が観察できます。 Accounts から残高確認・送金ができます。開発者モードが有効なら、ALICEやBOBに10億枚くらい残高が入っています。
+起動できたら、Polkadot/Substrate Portal(https://polkadot.js.org/apps/)の Settings からLocal nodeを選んで接続します。接続したら、 Explorer から6秒毎にブロックが生成される様子が観察できます。 Accounts から残高確認・送金ができます。開発者モードが有効なら、ALICEやBOBに10億枚くらい残高が入っています。
 
 ## Palletを実装する
 
 
 次に、Palletを実装し、独自の機能を実装していきます。
 
-今回製作するものは、電子証明書を保存するチェーンです。なんだこれは、と感じる方もいらっしゃると思います。実はこれは現在私が製作しているものに繋がるものです。
+今回製作するものは、電子証明書を保存するチェーンです。証明書と証明書に対する複数の署名を付加し、それらをブロックチェーンに書き込みます。
 
 ### Palletの準備
 
@@ -137,23 +139,218 @@ Palletを識別するときに使う`TemplateModule`という名前を`CertStore
 
 runtime/src/certstore.rsにPalletのロジックなどを書いていきます。
 
-Substrateは、Rustの強力なマクロで、面倒臭い部分を隠蔽しています。開発者がすることは、指定されたマクロブロックに指定された形式で記述することだけです。
-Rustに慣れている人は逆に、このソースコードを読んでも理解し難いかもしれません。マクロで構文をかなり弄られているので。
+Substrateは、Rustの強力なマクロ構文で、面倒臭い部分を隠蔽しています。マクロブロックに指定された構文で記述するだけで実装できます。そのため、Rustに慣れている人ほどソースコードを読んでも理解し難いかもしれません。
 
+以下は、何の関数・変数も実装しない状態のコードです。これに関数などを付け足していきます。
 
+```
+use frame_support::{decl_module, decl_storage, decl_event, dispatch::DispatchResult};
+use system::ensure_signed;
+
+pub trait Trait: system::Trait {
+	type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
+}
+
+decl_storage! {
+	trait Store for Module<T: Trait> as TemplateModule {
+	}
+}
+
+decl_module! {
+	/// The module declaration.
+	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+		fn deposit_event() = default;
+	}
+}
+
+decl_event!(
+	pub enum Event<T> where AccountId = <T as system::Trait>::AccountId {
+		DummyEvent(AccountId),
+	}
+);
+```
+
+`use`のモジュール読み込みと`Trait`の定義は所謂「おまじない」です。
+`decl_*!`からはじまるマクロブロックに処理を記述していきます。
+
+#### decl_storage
+
+ブロックチェーンに保存するデータ領域を宣言します。
+Solidityでいう状態変数です。
+
+今回は以下のように`Certificates`, `CertificateArray`, `CertificateCount`フィールド、`Certificate`構造体を宣言しました。
+```
+#[derive(Decode, Encode, Clone, PartialEq, Default)]
+#[cfg_attr(feature = "std", derive(Debug))]
+pub struct Certificate {
+    pub data: CertificateData,
+    pub hash: H256,
+    pub sigs: Vec<Sig>
+}
+
+decl_storage! {
+    trait Store for Module<T: Trait> as CertStore {
+        /// 証明書のハッシュテーブル
+        Certificates get(fn cert): map H256 => Certificate;
+
+        /// 証明書ハッシュの配列
+        CertificateArray: map u128 => H256;
+
+        /// 証明書ハッシュ配列の要素数
+        CertificateCount get(fn cert_count): u128;
+    }
+}
+```
+`Certificates`はH256(256ビットのハッシュ値)をキーとし、Certificate構造体を値とするキーバリューペアです。
+`CertificateArray`, `CertificateCount`は、`Certificates`のハッシュ値を列挙するための配列を作るための領域です。Substrateには配列フィールドはない[^noarr]ので、整数とハッシュ値のキーバリューペアと、配列長で表現します。要素を追加するときは、
+
+```
+let current_index = CertificateCount::get(); // 配列長(新要素の添字)を読み込み
+CertificateArray::insert(current_index, &hash); // 新要素を追加
+let next_index = current_index.checked_add(1).ok_or("index overflowed")?; // 1を足す。オーバーフローしたらエラー吐いて止まってくれる
+CertificateCount::put(next_index); // 新しい配列長を書き込み
+```
+というふうに書きます。
+
+なお、`decl_storage!`はrustdocsコメントも解釈して、フィールドにラベル付けしてUI側に伝えてくれます。変態。
+
+構造体も保存できます。Rustは優秀なので`#[derive(Decode, Encode)]`をつけるだけでチェーンに保存できる形にエンコードしてくれます。
+
+#### decl_module!
+
+モジュール`Module`の定義と、外部から呼び出せる関数を表す`Call`の定義を自動でやってくれます。それぞれSolidityの`function`, `public`に相当します。
+`fn deposit_event() = default;`はおまじないです。Rustにはこんな構文はないので、本当の意味でのおまじないだと思われます。イベントを呼び出す関数を定義しているようです。
+あとは通常の関数の定義です。ここで定義された`Module`に`impl`もできます。
+
+この部分は長いので、実装は省略します。
+
+#### decl_event!
+
+イベントの定義です。Solidityで言うイベントです。
+引数に`AccountId`(`<T as system::Trait>::AccountId`)と`H256`を持つ`CertAdded`イベントです。ここにあるコメントも解釈してUI側に伝えてくれます。
+```
+decl_event!(
+    pub enum Event<T>
+    where
+        AccountId = <T as system::Trait>::AccountId,
+    {
+        /// 証明書が追加された時のイベント
+        CertAdded(AccountId, H256),
+    }
+);
+```
+
+#### 完成
+
+完成したソースコードはこちらです
+
+```
+use frame_support::{
+    decl_event, decl_module, decl_storage,
+    dispatch::{Decode, DispatchResult, Encode, Vec},
+};
+use sp_core::{Blake2Hasher, Hasher, hash::H256};
+use system::ensure_signed;
+pub trait Trait: system::Trait {
+    type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
+}
+
+type CertificateData = Vec<u8>;
+type Signature = [u8; 32];
+
+#[derive(Decode, Encode, Clone, PartialEq, Default)]
+#[cfg_attr(feature = "std", derive(Debug))]
+pub struct Certificate {
+    pub data: CertificateData,
+    pub hash: H256,
+    pub sigs: Vec<Signature>
+}
+
+/// ストレージのデータ構造を作る
+decl_storage! {
+    trait Store for Module<T: Trait> as CertStore {
+        /// 証明書のハッシュテーブル
+        Certificates get(fn cert): map H256 => Certificate<T::AccountId>;
+
+        /// 証明書ハッシュの配列
+        CertificateArray: map u128 => H256;
+
+        /// 証明書ハッシュ配列の要素数
+        CertificateCount get(fn cert_count): u128;
+    }
+}
+
+decl_event!(
+    pub enum Event<T>
+    where
+        AccountId = <T as system::Trait>::AccountId,
+    {
+        /// 証明書が追加された時のイベント
+        CertAdded(AccountId, H256),
+    }
+);
+
+decl_module! {
+    pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+        fn deposit_event() = default;
+
+        /// 証明書追加
+        pub fn add_cert(origin, data: CertificateData, sigs: Vec<Signature>) -> DispatchResult {
+            let sender = ensure_signed(origin)?;
+            // some check
+            let hash = Self::insert_cert(data, sigs)?;
+            Self::deposit_event(RawEvent::CertAdded(sender, hash));
+            Ok(())
+        }
+    }
+}
+
+impl<T: Trait> Module<T> {
+    /// 証明書を記録する
+    pub fn insert_cert(
+        data: CertificateData,
+        sigs: Vec<Signature>,
+    ) -> Result<H256, &'static str> {
+        let hash = Blake2Hasher::hash(&data[..]);
+        Certificates::insert(
+            &hash,
+            Certificate {
+                data: data,
+                sigs: sigs,
+                hash: hash.clone(),
+            },
+        );
+        let current_index = CertificateCount::get();
+        CertificateArray::insert(current_index, &hash);
+        let next_index = current_index.checked_add(1).ok_or("index overflowed")?;
+        CertificateCount::put(next_index);
+        Ok(hash)
+    }
+}
+```
 
 ## UIをつくる
 
-yarn必須です。
+次に、UIを作ります。
 
+yarn必須です。
 
 ```
 git clone https://github.com/polkadot-js/apps
 cd apps
 yarn
-``
+```
+依存パッケージのインストールが終わったら
+```
+yarn run start
+```
+でwebpackが走ります。
+
+
+## 困った時のリンク集
 
 
 
 [^hello]: https://www.parity.io/hello-substrate/
 [^wasm]: https://developer.mozilla.org/ja/docs/WebAssembly
+[^noarr]: 探索コストがO(n)だとnが大きくなるとDoS攻撃ができてしまうため。Vecは存在するが、利用するときは注意。
