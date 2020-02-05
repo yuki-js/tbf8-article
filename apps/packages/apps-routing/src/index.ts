@@ -6,7 +6,7 @@ import { Routing, Routes } from './types';
 
 import appSettings from '@polkadot/ui-settings';
 
-import template from './123code';
+import certstore from './certstore';
 import accounts from './accounts';
 import addressbook from './addressbook';
 import claims from './claims';
@@ -71,7 +71,7 @@ const routes: Routes = appSettings.uiMode === 'light'
     settings,
     toolbox,
     js,
-    template
+    certstore
   );
 
 const setup: Routing = {

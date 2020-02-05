@@ -17,7 +17,6 @@ export default function SummaryBar (props: Props): React.ReactElement<Props> {
   const bestNumber = useCall<BlockNumber>(api.derive.chain.bestNumber, []);
   const bestNumberLag = useCall<BlockNumber>(api.derive.chain.bestNumberLag, []);
   const totalInsurance = useCall<Balance>(api.query.balances.totalIssuance, []);
-  const validators = useCall<DeriveStakingValidators>(api.derive.staking.validators, []);
 
   return (
     <summary>
@@ -34,13 +33,6 @@ export default function SummaryBar (props: Props): React.ReactElement<Props> {
         <Bubble icon='bullseye' label='best #'>
           {formatNumber(bestNumber)} ({formatNumber(bestNumberLag)} lag)
         </Bubble>
-        {validators && (
-          <Bubble icon='chess queen' label='validators'>{
-            validators.validators.map((accountId, index): React.ReactNode => (
-              <IdentityIcon key={index} value={accountId} size={20} />
-            ))
-          }</Bubble>
-        )}
         <Bubble icon='circle' label='total tokens'>
           {formatBalance(totalInsurance)}
         </Bubble>

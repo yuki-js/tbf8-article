@@ -4,22 +4,23 @@
 
 import { Routes } from './types';
 
-import Template from '@polkadot/app-123code';
+import Component from '../../app-certstore/src';
 
 export default ([
   {
-    Component: Template,
+    Component,
     display: {
-      isHidden: true,
+      isHidden: false,
       needsAccounts: true,
       needsApi: [
-        'tx.balances.transfer'
+        'tx.balances.transfer',
+        'tx.certStore.addCert'
       ]
     },
     i18n: {
-      defaultValue: 'Template'
+      defaultValue: 'CertStore'
     },
     icon: 'th',
-    name: '123code'
+    name: 'CertStore'
   }
 ] as Routes);

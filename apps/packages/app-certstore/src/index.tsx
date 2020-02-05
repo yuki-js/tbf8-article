@@ -5,10 +5,13 @@
 import { AppProps as Props } from '@polkadot/react-components/types';
 
 import React, { useState } from 'react';
+import AddCert from './AddCert'
 
 export default function TemplateApp ({ className }: Props): React.ReactElement<Props> {
   const [accountId, setAccountId] = useState<string | null>(null);
   return (
-    <main className={className}></main>
+    <main className={className}>
+      <AddCert />
+    </main>
   );
 }
