@@ -7,7 +7,9 @@ import {
   Drawer,
   Divider,
   Button,
-  Intent
+  Intent,
+  Tooltip,
+  Position
 } from "@blueprintjs/core";
 
 import { useApi } from "./Api";
@@ -51,7 +53,7 @@ export default function AddCert() {
       const len: any = await api.query.certStore.certificateCount();
 
       const hashList = await api.query.certStore.certificateArray.multi(
-        Array.from({ length: len }, (v, k) => k)
+        Array.from({ length: len }, (v, k) => k).reverse()
       );
 
       setHashes(hashList);
@@ -73,6 +75,7 @@ export default function AddCert() {
     setData(null);
     setOpen(false);
   }
+  //hashプロパティはバッファをさらにハッシュしたものであるから注意
   return (
     <section>
       <Text>クリックするとダウンロードできます</Text>
@@ -83,24 +86,52 @@ export default function AddCert() {
           key={i}
           style={elemStyle}
         >
-          {h.toString()}
+          <Text ellipsize={true}>{h.toString()}</Text>
         </Card>
       ))}
       {!hashes.length && <Spinner />}
-      <Drawer isOpen={isOpen} onClose={() => close()} style={elemStyle}>
+      <Drawer
+        isOpen={isOpen && data}
+        onClose={() => close()}
+        style={{ wordWrap: "break-word", padding: "10px" }}
+        size="85%"
+        title="証明書のダウンロード"
+        position={Position.BOTTOM}
+        icon="document"
+      >
         {data && (
-          <div>
-            <Text>{data.hash.toString()}</Text>
+          <>
+            <Text ellipsize={true}>Hash: {data.get("hash").toString()}</Text>
+
             <Divider />
             {data.sigs.map((f: any, i: any) => (
-              <Text key={i}>{f.account_id.toString()}</Text>
+              <Tooltip content={"署名文は" + f.signature.toString()}>
+                <Text key={i} ellipsize={true}>
+                  {f.account_id.toString()}
+                </Text>
+              </Tooltip>
             ))}
             <Text>に署名されています</Text>
             <Divider />
-            <Button onClick={download} intent={Intent.PRIMARY} icon="import">
+            <Text>Length: {data.get("data").length}</Text>
+            <Divider />
+            <Button
+              onClick={download}
+              intent={Intent.PRIMARY}
+              icon="import"
+              large={true}
+            >
               Download
             </Button>
-          </div>
+            <Button
+              onClick={close}
+              intent={Intent.NONE}
+              icon="cross"
+              large={true}
+            >
+              戻る
+            </Button>
+          </>
         )}
       </Drawer>
     </section>
