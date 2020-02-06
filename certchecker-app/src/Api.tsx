@@ -12,26 +12,26 @@ export interface ApiProps {
 let api: ApiPromise;
 const ApiContext = React.createContext({} as ApiProps)
 
-export {api}
-export default function Api({children}: Props): React.ReactElement<Props> | null{
+export { api }
+export default function Api({ children }: Props): React.ReactElement<Props> | null {
   const [isApiConnected, setIsApiConnected] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect((): void => {
-    const provider = new WsProvider('ws://ec2-54-197-6-7.compute-1.amazonaws.com:9944');
+    const provider = new WsProvider('ws://ec2-54-162-186-115.compute-1.amazonaws.com:9944');
     api = new ApiPromise({
       provider,
-      types:{
-        "Sig":{
-          "signature":"H512",
-          "account_id":"AccountId"
+      types: {
+        "Sig": {
+          "signature": "H512",
+          "account_id": "AccountId"
         },
-        "Certificate":{
-          "data":"CertificateData",
-          "hash":"H256",
-          "sigs":"Vec<Sig>"
+        "Certificate": {
+          "data": "CertificateData",
+          "hash": "H256",
+          "sigs": "Vec<Sig>"
         },
-        "CertificateData":"Vec<u8>"
+        "CertificateData": "Vec<u8>"
       }
     });
 
@@ -39,13 +39,13 @@ export default function Api({children}: Props): React.ReactElement<Props> | null
     api.on('disconnected', (): void => setIsApiConnected(false));
     api.on('ready', (): void => setIsInitialized(true));
   }, []);
-  if(!isInitialized) {
+  if (!isInitialized) {
     return null
   }
   return (
-      <ApiContext.Provider value={{ api, isApiConnected }}>
-        {children}
-      </ApiContext.Provider>
+    <ApiContext.Provider value={{ api, isApiConnected }}>
+      {children}
+    </ApiContext.Provider>
   )
 }
 export function useApi(): ApiProps {
