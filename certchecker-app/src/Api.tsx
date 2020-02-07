@@ -23,7 +23,7 @@ export default function Api({
 
   useEffect((): void => {
     const provider = new WsProvider(
-      "ws://loadbalance-58e8dd5b848aa0c8.elb.us-east-1.amazonaws.com:9944"
+      "ws://ec2-52-71-251-44.compute-1.amazonaws.com:9944"
     );
     api = new ApiPromise({
       provider,
