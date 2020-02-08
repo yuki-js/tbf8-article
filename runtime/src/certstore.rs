@@ -2,6 +2,7 @@ use core::convert::TryFrom;
 use frame_support::{
     decl_event, decl_module, decl_storage,
     dispatch::{Decode, DispatchResult, Encode, Vec},
+    ensure
 };
 use sp_core::{hash::{H256, H512}, Blake2Hasher, Hasher};
 use sp_runtime::traits::Verify;
@@ -58,13 +59,16 @@ decl_module! {
 
         /// 証明書追加
         pub fn add_cert(origin, data: CertificateData, sigs: Vec<Sig>) -> DispatchResult {
+            ensure!(data.len() < 1024, "Certification is too large");
+            ensure!(sigs.len() < 8, "Too many signers");
+            
             let sender = ensure_signed(origin)?; // 署名済みトランザクションか?
             Self::check_cert(&data, &sigs)?;
             let hash = Blake2Hasher::hash(&data[..]); // ハッシュ値計算
             let cert = Certificate { // 構造体を用意
                 data: data,
                 sigs: sigs,
-                hash: hash.clone(),
+                hash: hash,
             };
             Self::insert_cert(hash, cert)?; 
             Self::deposit_event(RawEvent::CertAdded(sender, hash)); // イベント発行
@@ -89,9 +93,9 @@ impl<T: Trait> Module<T> {
     }
     /// 証明書を記録する
     pub fn insert_cert(hash: H256, cert: Certificate) -> DispatchResult {
-        Certificates::insert(hash.clone(), cert);
+        Certificates::insert(hash, cert);
         let current_index = CertificateCount::get();
-        CertificateArray::insert(current_index, &hash);
+        CertificateArray::insert(current_index, hash);
         let next_index = current_index.checked_add(1).ok_or("index overflowed")?;
         CertificateCount::put(next_index);
         Ok(())
