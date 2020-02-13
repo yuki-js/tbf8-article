@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+<title>article.html</title>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+
+</head>
+
+<body>
+
+<h1 id="substratev2.0対応substrateことはじめ">Substrate v2.0対応 Substrateことはじめ</h1>
+
+<div style="text-align:right">ミスモナコイン</div>
+
+<p>ミスモナコインです。最近活動再開しました。以前は、ご存知の方はご存知の通り、ウォレットアプリ<a href="#fn:1" id="fnref:1" title="see footnote" class="footnote"><sup>1</sup></a>を開発していましたが、最近ではSubstrateを使って独自ブロックチェーンを開発しています。本記事ではSubstrateの紹介と、簡単なブロックチェーンを作ります。モナコイン要素はありません。</p>
+
+<p>本記事の情報は全て2020年2月現在のものです。</p>
+
+<h2 id="substrateとは">Substrateとは</h2>
+
+<p>Substrateとは、<strong>拡張性が高く</strong>、<strong>モジュール化された</strong>、<strong>オープンソース</strong>なブロックチェーン開発フレームワークです<a href="#fn:2" id="fnref:2" title="see footnote" class="footnote"><sup>2</sup></a>。開発元はParity Technologiesです。ParityはPolkadot, Parity Ethereum Clientなどを提供している企業です。Polkadotを開発する過程で、コア部分を分離してできたものがSubstrateです。</p>
+
+<p>Parity社紹介ページ: https://www.parity.io/substrate/</p>
+
+<p>Substrate Developer Hub: https://substrate.dev/</p>
+
+<p>ブロックチェーンの基本要素として、</p>
+
+<ul>
+<li>データベース層</li>
+<li>ネットワーク層</li>
+<li>コンセンサス層</li>
+<li>アプリケーション層</li>
+</ul>
+
+<p>がありますが、Substrateはアプリケーション層を除いた3層を提供し、アプリケーション層の開発に注力することができ、簡単かつ迅速なブロックチェーン開発ができます。</p>
+
+<h2 id="substrateの特徴">Substrateの特徴</h2>
+
+<h3 id="rustで書ける">Rustで書ける</h3>
+
+<p>RustはC/C++に代わる高速で安全なコンパイラ型言語です。機械語とWebAssemblyにコンパイルでき、また、ガベージコレクションを使わないメモリ管理により高速に動作するブロックチェーンを作れます。また、Rustのスパルタコンパイラーに叱られまくることによって、安全なコードが書けます。</p>
+
+<h3 id="webassembly">WebAssembly</h3>
+
+<p>WebAssemblyとは、「ネイティブに近いパフォーマンスで動作するコンパクトなバイナリー形式の低レベルなアセンブリ風言語」です<a href="#fn:3" id="fnref:3" title="see footnote" class="footnote"><sup>3</sup></a>。スタックマシン型のWebAssembly VM上で動作します。当初はJavaScriptに代わってブラウザで実行されることを想定されていましたが、シンプルで汎用的な仕様が受け、ブロックチェーンなどに応用されています</p>
+
+<p>SubstrateはWebAssemblyインタプリタを備えていて、WebAssemblyバイナリを与えることで、ノード全体を再コンパイルすることなく、ブロック生成ロジック(ランタイム)を変更することができます。WebAssemblyなので、速度もそこそこです。</p>
+
+<h3 id="フォークレス・アップグレード">フォークレス・アップグレード</h3>
+
+<p>今までのブロックチェーンでは、後方互換性がない変更をチェーンに加える場合、ハードフォークを実行しなければなりませんでした。DAO事件、Segwit論争を通して、ハードフォークには多くの政治的論争がつきものだということがわかりました。また、ハードフォークをするには、全てのノードをアップグレードしなければなりません。これがノード運営者の負担になっています。</p>
+
+<p>Substrateでは、WebAssemblyによるランタイム実行をできるようにすることで、外部からノードの挙動をアップグレードできるようになります。さらに、「アップグレードを投票で決める」という風に、チェーンアップグレードのコンセンサスを決めておくことで、論争を民主的かつブロックチェーンらしい方法で解決することができます。(オンチェーンガバナンス)</p>
+
+<h3 id="モジュール">モジュール</h3>
+
+<p>Substrateの各機能はモジュール化されています。ブロックチェーンを構築する際には、Palletと呼ばれるモジュールを組み合わて、 Framework for Runtime Aggregation of Modularized Entities(FRAME)を作ります。例えば、Contract Palletを実装すれば、スマートコントラクトVMを設定でき、Staking Palletを取り込めばステーキングが実装できます。多分。本記事では、Palletを作り、独自の処理を実装します。</p>
+
+<h3 id="polkadot">Polkadot</h3>
+
+<p>Parity Polkadot実装はSubstrateの上に実装されています。なので、Polkadotとの親和性が高いです。</p>
+
+<h2 id="環境構築">環境構築</h2>
+
+<p>以下のコマンドで、依存環境、Rustのインストール、WASMツールチェーンのインストールを自動で行ってくれます。</p>
+
+<pre><code>curl https://getsubstrate.io -sSf | bash
+</code></pre>
+
+<p>失敗する方は公式ドキュメントを参照してください。</p>
+
+<p>https://substrate.dev/docs/en/overview/getting-started</p>
+
+<p>##</p>
+
+<h2 id="素のチェーンを動かしてみる">素のチェーンを動かしてみる</h2>
+
+<p>まずは、テンプレートから何も手を加えない状態の、特に何をするわけでもないブロックチェーンノードを起動してみます。</p>
+
+<pre><code>git clone https://github.com/substrate-developer-hub/substrate-node-template
+cd substrate-node-template
+cargo build --release
+</code></pre>
+
+<p>ちなみに、上記gitリポジトリの執筆当時のコミットハッシュは1d6e830474290d3a1893a475aca305c1c65b5f03です</p>
+
+<p>ビルドが完了したら</p>
+
+<pre><code>./target/release/node-template purge-chain --dev
+</code></pre>
+
+<p>でチェーンをリセットし、</p>
+
+<pre><code>./target/release/node-template --dev
+</code></pre>
+
+<p>でノードを開発者モードで起動します。
+<code>localhost</code>以外からのRPC接続を受け付けるには<code>--ws-external --rpc-external</code>オプションを追加します。</p>
+
+<p>起動できたら、Polkadot/Substrate Portal(https://polkadot.js.org/apps/)の Settings からLocal nodeを選んで接続します。接続したら、 Explorer から6秒毎にブロックが生成される様子が観察できます。 Accounts から残高確認・送金ができます。開発者モードが有効なら、ALICEやBOBに10億枚くらい残高が入っています。</p>
+
+<h2 id="palletを実装する">Palletを実装する</h2>
+
+<p>次に、Palletを実装し、独自の機能を実装していきます。</p>
+
+<p>今回製作するものは、電子証明書を保存するチェーンです。証明書と証明書に対する複数の署名を付加し、それらをブロックチェーンに書き込みます。</p>
+
+<h3 id="palletの準備">Palletの準備</h3>
+
+<p>まず、runtime/src/template.rsを、runtime/src/certstore.rsにリネームします。</p>
+
+<p>次に、runtime/src/lib.rsをエディタで開きます。</p>
+
+<pre><code>mod template;
+</code></pre>
+
+<p>となっている部分を、</p>
+
+<pre><code>mod certstore;
+</code></pre>
+
+<p>に置換します。</p>
+
+<p><code>impl template</code>の部分を<code>impl certstore</code>に置換します。</p>
+
+<pre><code>-impl template::Trait for Runtime {
++impl certstore::Trait for Runtime {
+</code></pre>
+
+<p>Palletを識別するときに使う<code>TemplateModule</code>という名前を<code>CertStore</code>と変更し、<code>template</code>を<code>certstore</code>に変更します。</p>
+
+<pre><code>-TemplateModule: template::{Module, Call, Storage, Event&lt;T&gt;},
++TemplateModule: template::{Module, Call, Storage, Event&lt;T&gt;},
+</code></pre>
+
+<p>最後にruntime/src/certstore.rsの<code>decl_storage!</code>マクロ内の<code>TemplateModule</code>の名前を変更します。</p>
+
+<pre><code>-trait Store for Module&lt;T: Trait&gt; as TemplateModule {
++trait Store for Module&lt;T: Trait&gt; as CertStore {
+</code></pre>
+
+<p>これでcertstoreという名前でPalletを使えます。</p>
+
+<h3 id="palletの実装">Palletの実装</h3>
+
+<p>runtime/src/certstore.rsにPalletのロジックなどを書いていきます。</p>
+
+<p>Substrateは、Rustの強力なマクロ構文で、面倒臭い部分を隠蔽しています。マクロブロックに指定された構文で記述するだけで実装できます。そのため、Rustに慣れている人ほどソースコードを読んでも理解し難いかもしれません。</p>
+
+<p>以下が完成品です。</p>
+
+<pre><code>use core::convert::TryFrom;
+use frame_support::{
+    decl_event, decl_module, decl_storage,
+    dispatch::{Decode, DispatchResult, Encode, Vec},
+};
+use sp_core::{hash::{H256, H512}, Blake2Hasher, Hasher};
+use sp_runtime::traits::Verify;
+use sp_runtime::MultiSignature;
+use system::ensure_signed;
+
+pub trait Trait: system::Trait {
+    type Event: From&lt;Event&lt;Self&gt;&gt; + Into&lt;&lt;Self as system::Trait&gt;::Event&gt;;
+}
+
+type CertificateData = Vec&lt;u8&gt;;
+
+#[derive(Decode, Encode, Clone, PartialEq, Default, Debug)]
+pub struct Sig {
+    // Signatureって名前を使うとバグるっぽい
+    pub signature: H512,
+    pub account_id: sp_runtime::AccountId32,
+}
+
+#[derive(Decode, Encode, Clone, PartialEq, Default)]
+#[cfg_attr(feature = &quot;std&quot;, derive(Debug))]
+pub struct Certificate {
+    pub data: CertificateData,
+    pub hash: H256,
+    pub sigs: Vec&lt;Sig&gt;,
+}
+
+decl_storage! {
+    trait Store for Module&lt;T: Trait&gt; as CertStore {
+        /// 証明書のハッシュテーブル
+        Certificates get(fn cert): map H256 =&gt; Certificate;
+
+        /// 証明書ハッシュの配列
+        CertificateArray: map u128 =&gt; H256;
+
+        /// 証明書ハッシュ配列の要素数
+        CertificateCount get(fn cert_count): u128;
+    }
+}
+
+decl_event!(
+    pub enum Event&lt;T&gt;
+    where
+        AccountId = &lt;T as system::Trait&gt;::AccountId,
+    {
+        /// 証明書が追加されました!
+        CertAdded(AccountId, H256),
+    }
+);
+
+decl_module! {
+    pub struct Module&lt;T: Trait&gt; for enum Call where origin: T::Origin {
+        fn deposit_event() = default;
+
+        /// 証明書追加
+        pub fn add_cert(origin, data: CertificateData, sigs: Vec&lt;Sig&gt;) -&gt; DispatchResult {
+            let sender = ensure_signed(origin)?;
+            // some check
+            Self::check_cert(&amp;data, &amp;sigs)?;
+            let hash = Blake2Hasher::hash(&amp;data[..]);
+            let cert = Certificate {
+                data: data,
+                sigs: sigs,
+                hash: hash.clone(),
+            };
+            Self::insert_cert(hash, cert)?;
+            Self::deposit_event(RawEvent::CertAdded(sender, hash));
+
+            Ok(())
+        }
+    }
+}
+
+impl&lt;T: Trait&gt; Module&lt;T&gt; {
+    /// 証明書をチェックする
+    pub fn check_cert(cert: &amp;CertificateData, sigs: &amp;Vec&lt;Sig&gt;) -&gt; DispatchResult {
+        for sig in sigs.iter() {
+            let s = MultiSignature::Sr25519(
+                sp_core::sr25519::Signature::try_from(&amp;sig.signature[..]).map_err(|_| &quot;This is not a signature&quot;)?,
+            );
+            if !s.verify(&amp;cert[..], &amp;sig.account_id) {
+                return Err(sp_runtime::DispatchError::Other(&quot;Signature is invalid&quot;));
+            }
+        }
+        Ok(())
+    }
+    /// 証明書を記録する
+    pub fn insert_cert(hash: H256, cert: Certificate) -&gt; DispatchResult {
+        Certificates::insert(hash.clone(), cert);
+        let current_index = CertificateCount::get();
+        CertificateArray::insert(current_index, &amp;hash);
+        let next_index = current_index.checked_add(1).ok_or(&quot;index overflowed&quot;)?;
+        CertificateCount::put(next_index);
+        Ok(())
+    }
+}
+</code></pre>
+
+<p><code>use</code>のモジュール読み込みと<code>Trait</code>の定義は所謂「おまじない」です。
+<code>decl_*!</code>からはじまるマクロブロックに処理を記述していきます。</p>
+
+<h4 id="decl_storage">decl_storage</h4>
+
+<p>ブロックチェーンに保存するデータ領域を宣言します。
+Solidityでいう状態変数です。</p>
+
+<p>今回は以下のように<code>Certificates</code>, <code>CertificateArray</code>, <code>CertificateCount</code>フィールド、<code>Certificate</code>構造体を宣言しました。</p>
+
+<pre><code>#[derive(Decode, Encode, Clone, PartialEq, Default)]
+#[cfg_attr(feature = &quot;std&quot;, derive(Debug))]
+pub struct Certificate { ... 省略 ...}
+
+decl_storage! {
+    trait Store for Module&lt;T: Trait&gt; as CertStore {
+        /// 証明書のハッシュテーブル
+        Certificates get(fn cert): map H256 =&gt; Certificate;
+        /// 証明書ハッシュの配列
+        CertificateArray: map u128 =&gt; H256;
+        /// 証明書ハッシュ配列の要素数
+        CertificateCount get(fn cert_count): u128;
+    }
+}
+</code></pre>
+
+<p><code>Certificates</code>はH256(256ビットのハッシュ値)をキーとし、Certificate構造体を値とするキーバリューペアです。
+<code>CertificateArray</code>, <code>CertificateCount</code>は、<code>Certificates</code>のハッシュ値を列挙するための配列を作るための領域です。Substrateには配列フィールドはない<a href="#fn:4" id="fnref:4" title="see footnote" class="footnote"><sup>4</sup></a>ので、整数とハッシュ値のキーバリューペアと、配列長で表現します。要素を追加するときは、</p>
+
+<pre><code>let current_index = CertificateCount::get(); // 配列長(新要素の添字)を読み込み
+CertificateArray::insert(current_index, &amp;hash); // 新要素を追加
+let next_index = current_index.checked_add(1).ok_or(&quot;index overflowed&quot;)?; // 1を足す。オーバーフローしたらエラー吐いて止まってくれる
+CertificateCount::put(next_index); // 新しい配列長を書き込み
+</code></pre>
+
+<p>というふうに書きます。</p>
+
+<p>なお、<code>decl_storage!</code>はrustdocsコメントも解釈して、フィールドにラベル付けしてUI側に伝えてくれます。変態。</p>
+
+<p>構造体も保存できます。Rustは優秀なので<code>#[derive(Decode, Encode)]</code>をつけるだけでチェーンに保存できる形にエンコードしてくれます。</p>
+
+<h4 id="decl_module">decl_module!</h4>
+
+<p>モジュール<code>Module</code>の定義と、外部から呼び出せる関数を表す<code>Call</code>の定義を自動でやってくれます。それぞれSolidityの<code>function</code>, <code>public</code>に相当します。
+<code>fn deposit_event() = default;</code>はおまじないです。Rustにはこんな構文はないので、本当の意味でのおまじないだと思われます。イベントを呼び出す関数を定義しているようです。
+あとは通常の関数の定義です。ここで定義された<code>Module</code>に<code>impl</code>もできます。</p>
+
+<p><code>let sender = ensure_signed(origin)?;</code>は、署名されているかどうかを調べ、署名者のアドレスを返してくれます。署名済みでなければErr(_)を返します。<code>ensure_none</code>というのもあって、署名されていないトランザクションかどうかを調べてくれます。これは、手数料をかけなくてもいいような軽い処理や、自前で署名検証機構を備えている時に便利です。</p>
+
+<h4 id="decl_event">decl_event!</h4>
+
+<p>イベントの定義です。Solidityで言うイベントです。
+引数に<code>AccountId</code>(<code>&lt;T as system::Trait&gt;::AccountId</code>)と<code>H256</code>を持つ<code>CertAdded</code>イベントです。ここにあるコメントも解釈してUI側に伝えてくれます。</p>
+
+<h4 id="完成">完成</h4>
+
+<p>完成したら、</p>
+
+<pre><code>cargo build --release
+</code></pre>
+
+<p>でビルドをし</p>
+
+<pre><code>./target/release/node-template purge-chain --dev
+</code></pre>
+
+<p>でチェーンをリセットし、</p>
+
+<pre><code>./target/release/node-template --dev
+</code></pre>
+
+<p>で起動できます。</p>
+
+<h2 id="困った時のリンク集">困った時のリンク集</h2>
+
+<h4 id="substratedeveloperhub">Substrate Developer Hub</h4>
+
+<p>https://substrate.dev/</p>
+
+<p>Substrateの公式ドキュメントサイトです。</p>
+
+<div class="footnotes">
+<hr />
+<ol>
+
+<li id="fn:1">
+<p>https://monya&#8211;wallet.github.io/ <a href="#fnref:1" title="return to body" class="reversefootnote">&#160;&#8617;</a></p>
+</li>
+
+<li id="fn:2">
+<p>https://www.parity.io/hello&#8211;substrate/ <a href="#fnref:2" title="return to body" class="reversefootnote">&#160;&#8617;</a></p>
+</li>
+
+<li id="fn:3">
+<p>https://developer.mozilla.org/ja/docs/WebAssembly <a href="#fnref:3" title="return to body" class="reversefootnote">&#160;&#8617;</a></p>
+</li>
+
+<li id="fn:4">
+<p>探索コストがO(n)だとnが大きくなるとDoS攻撃ができてしまうため。Vecは存在するが、利用するときは注意。 <a href="#fnref:4" title="return to body" class="reversefootnote">&#160;&#8617;</a></p>
+</li>
+
+</ol>
+</div>
+
+</body>
+</html>
