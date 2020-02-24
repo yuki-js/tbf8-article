@@ -9,5 +9,10 @@ ADD . /certstore
 WORKDIR /certstore
 RUN cargo build --release
 
-EXPOSE 9944
-CMD ["/certstore/target/release/node-template", "--dev", "--ws-external"]
+EXPOSE 9944/tcp
+EXPOSE 30333/tcp
+EXPOSE 9933/tcp
+EXPOSE 9955/tcp
+EXPOSE 5353/udp
+EXPOSE 48633/udp
+CMD ["/certstore/target/release/node-template", "--ws-external", "--validator", "--chain", "/certstore/customspec.json", "--rpc-cors", "all"]
