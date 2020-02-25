@@ -2,7 +2,7 @@
   "name": "CertStore Testnet",
   "id": "CertStore_testnet",
   "bootNodes": [
-    "/ip4/127.0.0.1/tcp/30333/p2p/QmbWrnRXTneCqqGtj7CbS8vvJ6VibY5MHAbGgJKK19tcdX"
+    "/ip4/certstore.mynumber.dev/tcp/30333/p2p/QmNxrBBhgJ8iJ5kH59CKscGS7MVvZ6QppAq3W5Pr8RXgHm"
   ],
   "telemetryEndpoints": null,
   "protocolId": null,

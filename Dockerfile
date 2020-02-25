@@ -15,4 +15,4 @@ EXPOSE 9933/tcp
 EXPOSE 9955/tcp
 EXPOSE 5353/udp
 EXPOSE 48633/udp
-CMD ["/certstore/target/release/node-template", "--ws-external", "--validator", "--chain", "/certstore/customspec.json", "--rpc-cors", "all"]
+CMD ["/certstore/target/release/node-template", "--unsafe-ws-external", "--validator", "--chain", "/certstore/customspec.json", "--rpc-cors", "all"]
