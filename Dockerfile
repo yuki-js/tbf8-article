@@ -15,4 +15,4 @@ EXPOSE 9933/tcp
 EXPOSE 9955/tcp
 EXPOSE 5353/udp
 EXPOSE 48633/udp
-CMD ["/certstore/target/release/node-template", "--unsafe-ws-external", "--validator", "--chain", "/certstore/customspec.json", "--rpc-cors", "all"]
+CMD ["/certstore/target/release/node-template", "--unsafe-ws-external", "--validator", "--chain", "/certstore/customspec.json", "--rpc-cors", "all", "--bootnodes", "/dns4/nb.yasui.mynumber.dev/tcp/30333/p2p/Qmc3h5BonDEzehzzozjQVpx2as8iNGpUPfenpA6aWUG4S1"]

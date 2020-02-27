@@ -22,9 +22,7 @@ export default function Api({
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect((): void => {
-    const provider = new WsProvider(
-      "ws://ec2-52-71-251-44.compute-1.amazonaws.com:9944"
-    );
+    const provider = new WsProvider("wss://certstore.mynumber.dev:443");
     api = new ApiPromise({
       provider,
       types: {
